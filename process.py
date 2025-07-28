@@ -51,6 +51,18 @@ def load_existing_parquet(path):
     return gpd.GeoDataFrame(columns=["id", "datetime", "geometry", "assets", "links"], crs="EPSG:4326")
 
 def create_stac_item(date, id, assets, asset_type):
+    if not assets:
+        return {
+            "type": "Feature",
+            "stac_version": "1.0.0",
+            "id": id,
+            "datetime": pd.to_datetime(date),
+            "geometry": None,
+            "bbox": None,
+            "assets": {},
+            "links": []
+        }
+
     geoms = [a["geometry"] for a in assets]
     merged_geom = unary_union(geoms).envelope
     return {
@@ -94,23 +106,32 @@ def main():
         geojson_path = f"{GCS_BUCKET}/{folder_name}/{folder_name}.geojson"
         if not fs.exists(geojson_path):
             print(f"❌ No .geojson found in {folder_name}")
+            # Mark as empty to avoid retry
+            new_records.append(
+                create_stac_item(date, folder_name, [], "application/geo+json")
+            )
             continue
 
-        # Download
+        # Download and parse
         local_path = OUTPUT_DIR / f"{folder_name}.geojson"
         try:
             with fs.open(geojson_path, "rb") as remote, open(local_path, "wb") as local:
                 local.write(remote.read())
         except Exception as e:
             print(f"⚠️ Error downloading {geojson_path}: {e}")
+            new_records.append(
+                create_stac_item(date, folder_name, [], "application/geo+json")
+            )
             continue
 
-        # Read geometry
         try:
             gdf = gpd.read_file(local_path)
             geom = unary_union(gdf.geometry).envelope
         except Exception as e:
             print(f"❌ Error reading {local_path}: {e}")
+            new_records.append(
+                create_stac_item(date, folder_name, [], "application/geo+json")
+            )
             continue
 
         asset_url = f"https://storage.googleapis.com/{geojson_path}"
