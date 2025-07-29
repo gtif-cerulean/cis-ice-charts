@@ -21,7 +21,7 @@ OUTPUT_DIR = Path(OUTPUT_DIR)
 
 # Custom filters
 SKIP_SUFFIXES = [".tar"]
-SKIP_PREFIXES = ["BAD_", "TMP_", "TEST_"]
+SKIP_PREFIXES = ["cis_"] # it seems all cis_ folders have broken geometries that can't be processed
 
 START_DATE = os.getenv("START_DATE", "2025-01-01")
 END_DATE = os.getenv("END_DATE", "2025-01-05")
