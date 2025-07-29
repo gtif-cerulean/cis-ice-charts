@@ -185,6 +185,10 @@ def main():
         print(f"✅ Saved {len(new_records)} new records to {PARQUET_PATH}")
     else:
         print("No new individual geojson assets to save.")
+    
+    # Copy assets parquet to output directory
+    print(f"Copying {PARQUET_PATH} to {OUTPUT_DIR}")
+    shutil.copy(PARQUET_PATH, OUTPUT_DIR)
 
     # Grouped daily items
     grouped_existing = load_existing_parquet(GROUPED_PARQUET_PATH)
@@ -206,6 +210,10 @@ def main():
     final["links"] = final.apply(add_style_link, axis=1)
     final.to_parquet(GROUPED_PARQUET_PATH)
     print(f"✅ Saved grouped items to {GROUPED_PARQUET_PATH} ({len(final)} total items)")
+
+    # copy final grouped items to output directory
+    print(f"Copying {GROUPED_PARQUET_PATH} to {OUTPUT_DIR}")
+    shutil.copy(GROUPED_PARQUET_PATH, OUTPUT_DIR)
 
 def merge_items_per_day(df):
     merged = []
