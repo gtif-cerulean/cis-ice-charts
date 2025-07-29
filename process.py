@@ -9,6 +9,7 @@ import gcsfs
 import geopandas as gpd
 import pandas as pd
 from shapely.ops import unary_union
+from shapely.geometry import Point
 
 # --- Config ---
 GCS_BUCKET = "cis-ice-charts-public"
@@ -18,9 +19,12 @@ GROUPED_PARQUET_PATH = "daily_items.parquet"
 
 # Custom filters
 SKIP_SUFFIXES = [".tar"]
-SKIP_PREFIXES = ["BAD_", "TMP_", "TEST_"]  # customize as needed
+SKIP_PREFIXES = ["BAD_", "TMP_", "TEST_"]
 START_DATE = datetime.strptime("2025-01-01", "%Y-%m-%d").date()
-END_DATE = datetime.strptime("2025-01-15", "%Y-%m-%d").date()
+END_DATE = datetime.strptime("2025-01-05", "%Y-%m-%d").date()
+
+ASSET_BASE_URL_GEOJSON = os.getenv("ASSET_BASE_URL_GEOJSON", "http://127.0.0.1:9091/geojsons")
+STYLE_URL = os.getenv("STYLE_URL", "https://raw.githubusercontent.com/gtif-cerulean/assets/refs/heads/main/styles/dmi-ice-charts.json")
 
 # Make sure directories exist
 OUTPUT_DIR.mkdir(exist_ok=True)
@@ -50,6 +54,29 @@ def load_existing_parquet(path):
         return gpd.read_parquet(path)
     return gpd.GeoDataFrame(columns=["id", "datetime", "geometry", "assets", "links"], crs="EPSG:4326")
 
+def add_style_link(row):
+    # Skip if base URL isn't set
+    if not STYLE_URL:
+        return row.get("links", [])
+
+    assets = row.get("assets", {})
+    asset_keys = list(assets.keys())
+    if not asset_keys:
+        return row.get("links", [])
+
+    # Remove old style links
+    links = [link for link in row.get("links", []) if link.get("rel") != "style"]
+
+    # Append new style link
+    links.append({
+        "rel": "style",
+        "href": f"{STYLE_URL}",
+        "type": "text/vector-styles",
+        "asset:keys": asset_keys
+    })
+
+    return links
+
 def create_stac_item(date, id, assets, asset_type):
     if not assets:
         return {
@@ -60,7 +87,11 @@ def create_stac_item(date, id, assets, asset_type):
             "geometry": None,
             "bbox": None,
             "assets": {},
-            "links": []
+            "links": [],
+            "properties": {
+                "description": "Error downloading or processing assets",
+                "invalid": True
+            }
         }
 
     geoms = [a["geometry"] for a in assets]
@@ -134,7 +165,7 @@ def main():
             )
             continue
 
-        asset_url = f"https://storage.googleapis.com/{geojson_path}"
+        asset_url = f"{ASSET_BASE_URL_GEOJSON}/{folder_name}.geojson"
         new_records.append(
             create_stac_item(date, folder_name, [{"url": asset_url, "geometry": geom}], "application/geo+json")
         )
@@ -166,12 +197,18 @@ def main():
 
     # Merge per day
     final = merge_items_per_day(merged)
+     # Add style links to grouped items
+    final["links"] = final.apply(add_style_link, axis=1)
     final.to_parquet(GROUPED_PARQUET_PATH)
     print(f"✅ Saved grouped items to {GROUPED_PARQUET_PATH} ({len(final)} total items)")
 
 def merge_items_per_day(df):
     merged = []
 
+    # Exclude items marked as invalid
+    if "properties" in df.columns:
+        df = df[~df["properties"].apply(lambda props: props.get("invalid", False) if isinstance(props, dict) else False)]
+        
     for id_, group in df.groupby("id"):
         geoms = group["geometry"].tolist()
         geom = unary_union(geoms).envelope
