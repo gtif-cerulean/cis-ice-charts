@@ -20,8 +20,11 @@ GROUPED_PARQUET_PATH = "daily_items.parquet"
 # Custom filters
 SKIP_SUFFIXES = [".tar"]
 SKIP_PREFIXES = ["BAD_", "TMP_", "TEST_"]
-START_DATE = datetime.strptime("2025-01-01", "%Y-%m-%d").date()
-END_DATE = datetime.strptime("2025-01-05", "%Y-%m-%d").date()
+
+START_DATE = os.getenv("START_DATE", "2025-01-01")
+END_DATE = os.getenv("END_DATE", "2025-01-05")
+START_DATE = datetime.strptime(START_DATE, "%Y-%m-%d").date()
+END_DATE = datetime.strptime(END_DATE, "%Y-%m-%d").date()
 
 ASSET_BASE_URL_GEOJSON = os.getenv("ASSET_BASE_URL_GEOJSON", "http://127.0.0.1:9091/geojsons")
 STYLE_URL = os.getenv("STYLE_URL", "https://raw.githubusercontent.com/gtif-cerulean/assets/refs/heads/main/styles/dmi-ice-charts.json")
@@ -208,7 +211,7 @@ def merge_items_per_day(df):
     # Exclude items marked as invalid
     if "properties" in df.columns:
         df = df[~df["properties"].apply(lambda props: props.get("invalid", False) if isinstance(props, dict) else False)]
-        
+
     for id_, group in df.groupby("id"):
         geoms = group["geometry"].tolist()
         geom = unary_union(geoms).envelope
