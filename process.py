@@ -13,9 +13,11 @@ from shapely.geometry import Point
 
 # --- Config ---
 GCS_BUCKET = "cis-ice-charts-public"
-OUTPUT_DIR = Path("geojsons")
-PARQUET_PATH = "geojson_assets.parquet"
-GROUPED_PARQUET_PATH = "daily_items.parquet"
+
+PARQUET_PATH = os.getenv("PARQUET_PATH", "geojson_assets.parquet")
+GROUPED_PARQUET_PATH = os.getenv("GROUPED_PARQUET_PATH", "daily_items.parquet")
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "geojsons")
+OUTPUT_DIR = Path(OUTPUT_DIR)
 
 # Custom filters
 SKIP_SUFFIXES = [".tar"]
