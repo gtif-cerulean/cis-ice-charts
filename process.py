@@ -21,7 +21,7 @@ OUTPUT_DIR = Path(OUTPUT_DIR)
 
 # Custom filters
 SKIP_SUFFIXES = [".tar"]
-SKIP_PREFIXES = ["cis_"] # it seems all cis_ folders have broken geometries that can't be processed
+SKIP_PREFIXES = ["cis_", "SGRDAWIS", "SGRDREA_"] # these folders seem to have broken geometries that can't be processed or missing geojsons
 
 START_DATE = os.getenv("START_DATE", "2025-01-01")
 END_DATE = os.getenv("END_DATE", "2025-01-05")
